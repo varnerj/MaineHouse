@@ -8,9 +8,12 @@ proximity radius plus margin), used for oceanfront classification, the
 mooring-field proxy signal, and the upriver/bridge flag.
 """
 import logging
+import urllib.error
+import urllib.request
 from dataclasses import dataclass, field
 from typing import Optional
 
+from . import config
 from .geomath import haversine_m, point_to_segment_distance_m, bearing_deg
 from .httpclient import post_form_json
 
@@ -18,6 +21,29 @@ log = logging.getLogger(__name__)
 
 OVERPASS_URL = "https://overpass-api.de/api/interpreter"
 QUERY_RADIUS_M = 1200
+
+
+def check_overpass_reachable(timeout_s=config.OVERPASS_PREFLIGHT_TIMEOUT_S):
+    """Fast, single-attempt reachability probe (no retries, short timeout),
+    run once at the start of a pipeline run. A blocked/unreachable Overpass
+    endpoint was observed taking tens of seconds to minutes to fail on a
+    *per-listing* basis (dual-stack connection attempts trying multiple
+    addresses through httpclient's normal retry logic) -- checking once up
+    front lets a run skip new-listing assessment entirely and finish in
+    seconds instead of grinding through hundreds of slow per-listing
+    failures."""
+    req = urllib.request.Request(
+        OVERPASS_URL,
+        data=b"data=[out:json][timeout:5];out count;",
+        headers={"User-Agent": config.USER_AGENT, "Content-Type": "application/x-www-form-urlencoded"},
+        method="POST",
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=timeout_s) as resp:
+            return resp.status == 200
+    except Exception as e:  # noqa: BLE001
+        log.warning("Overpass preflight check failed (%s) -- treating as unreachable this run", e)
+        return False
 
 _QUERY_TMPL = """
 [out:json][timeout:25];

@@ -7,7 +7,7 @@ import types
 from dataclasses import dataclass, field
 from datetime import date
 
-from . import config, redfin, state, viability
+from . import config, geo_context, redfin, state, viability
 
 log = logging.getLogger(__name__)
 
@@ -72,6 +72,26 @@ def run(max_new_assessments=config.MAX_NEW_ASSESSMENTS_PER_RUN, sleep_between_as
 
     diff = DiffResult(total_candidates_considered=len(candidates))
     log.info("%d candidates to process (price <= $%d)", len(candidates), config.PRICE_UPPER_MAX)
+
+    # Overpass was observed to be unreachable from both a home IP (after
+    # heavy testing traffic) and a GitHub Actions runner IP, with each
+    # per-listing failure taking tens of seconds to minutes to surface
+    # through httpclient's normal retry/timeout handling -- at candidate-set
+    # scale that turns into a multi-hour hang. A single fast, short-timeout
+    # check up front lets a genuinely bad-Overpass-day run skip new-listing
+    # assessment entirely and finish in seconds instead.
+    overpass_ok = geo_context.check_overpass_reachable()
+    if not overpass_ok:
+        msg = (
+            "OpenStreetMap Overpass was unreachable at the start of this run "
+            "(preflight check failed); skipping viability assessment for any "
+            "newly-seen listings this run. Already-assessed listings still had "
+            "price/status refreshed normally. This should resolve on its own; "
+            "see README 'Observed during development' for details."
+        )
+        log.warning(msg)
+        warnings.append(msg)
+
     run_start = time.monotonic()
 
     with state.connect() as conn:
@@ -96,6 +116,8 @@ def run(max_new_assessments=config.MAX_NEW_ASSESSMENTS_PER_RUN, sleep_between_as
             if has_cache:
                 assessment = _cached_assessment_from_row(existing_row)
             else:
+                if not overpass_ok:
+                    continue  # leave unassessed for now; will be picked up next run
                 if max_new_assessments is not None and assessed_new_count >= max_new_assessments:
                     continue  # leave unassessed for now; will be picked up next run
                 if listing.lat is None or listing.lon is None:

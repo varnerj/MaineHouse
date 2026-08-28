@@ -65,6 +65,16 @@ FALLBACK_NAVD88_TO_MLLW_OFFSET_M = 1.7
 MAX_NEW_ASSESSMENTS_PER_RUN = 250
 
 USER_AGENT = "MaineOceanfrontListingAgent/0.1 (contact: varnerj08@gmail.com)"
-HTTP_TIMEOUT_S = 20
+# Observed in testing: a blocked/unreachable endpoint can take much longer
+# than a genuinely slow-but-working one to fail (dual-stack connection
+# attempts trying multiple addresses before giving up), so a shorter
+# per-attempt timeout matters more for failing fast than for patience with
+# a slow-but-working server.
+HTTP_TIMEOUT_S = 10
+# Fast, single-attempt timeout for the Overpass preflight check specifically
+# (see geo_context.check_overpass_reachable) -- deliberately shorter than
+# HTTP_TIMEOUT_S so a fully-blocked endpoint is detected in seconds, not
+# tens of seconds.
+OVERPASS_PREFLIGHT_TIMEOUT_S = 8
 
 NOMINATIM_CONTACT_EMAIL = "varnerj08@gmail.com"
