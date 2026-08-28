@@ -31,9 +31,11 @@ jobs:
 
       - name: Run pipeline and send report
         env:
-          GMAIL_ADDRESS: ${{ secrets.GMAIL_ADDRESS }}
+          # Repo secret names (EMAIL_FROM / EMAIL_TO / GMAIL_APP_PASSWORD)
+          # mapped to the names mailer.py reads.
+          GMAIL_ADDRESS: ${{ secrets.EMAIL_FROM }}
           GMAIL_APP_PASSWORD: ${{ secrets.GMAIL_APP_PASSWORD }}
-          REPORT_TO_ADDRESS: ${{ secrets.REPORT_TO_ADDRESS }}
+          REPORT_TO_ADDRESS: ${{ secrets.EMAIL_TO }}
           PYTHONPATH: src
         run: python -m maine_agent.main -v
 

@@ -94,10 +94,14 @@ to avoid. Redfin is the sole listing source.
    <https://myaccount.google.com/apppasswords> (App: Mail). This is a
    16-character password, not your normal Gmail password.
 2. **Repo secrets** (Settings → Secrets and variables → Actions):
-   - `GMAIL_ADDRESS` — the sending Gmail address.
+   - `EMAIL_FROM` — the sending Gmail address.
    - `GMAIL_APP_PASSWORD` — the app password from step 1.
-   - `REPORT_TO_ADDRESS` — where the report should go (can be the same as
-     `GMAIL_ADDRESS`).
+   - `EMAIL_TO` — where the report should go (can be the same as
+     `EMAIL_FROM`).
+   - The workflow maps these to the env var names `mailer.py` reads
+     (`GMAIL_ADDRESS`, `GMAIL_APP_PASSWORD`, `REPORT_TO_ADDRESS`) --
+     see `.github/workflows/daily-report.yml`. Running `main.py` locally
+     uses the `mailer.py` names directly (see "Running locally" below).
    - Your GitHub personal access token used locally to push must include
      the `workflow` scope to push changes to files under
      `.github/workflows/`; this isn't needed for the daily run itself
