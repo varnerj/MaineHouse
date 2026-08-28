@@ -1,0 +1,56 @@
+name: Daily Maine oceanfront report
+
+on:
+  schedule:
+    # 11:00 UTC ~= 7:00 AM America/New_York during EDT (roughly Mar-Nov).
+    # During EST (winter) this fires ~6:00 AM ET instead -- GitHub Actions
+    # cron is UTC-only and cannot follow DST. See README "Scheduling".
+    - cron: "0 11 * * *"
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+
+concurrency:
+  group: daily-report
+  cancel-in-progress: false
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    # Generous but bounded: at the default per-run new-listing cap this
+    # should finish well under an hour, but fail cleanly instead of
+    # consuming Actions' 6-hour default job timeout if something stalls.
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Run pipeline and send report
+        env:
+          GMAIL_ADDRESS: ${{ secrets.GMAIL_ADDRESS }}
+          GMAIL_APP_PASSWORD: ${{ secrets.GMAIL_APP_PASSWORD }}
+          REPORT_TO_ADDRESS: ${{ secrets.REPORT_TO_ADDRESS }}
+          PYTHONPATH: src
+        run: python -m maine_agent.main -v
+
+      - name: Commit updated state
+        # Always run, even if the pipeline step above failed or the job hit
+        # its timeout: pipeline.py commits state to the SQLite file
+        # periodically during a run specifically so a partial run's
+        # already-computed (expensive) results aren't lost -- but that only
+        # helps if this step still pushes them back to the repo.
+        if: always()
+        run: |
+          git config user.name "maine-oceanfront-bot"
+          git config user.email "actions@users.noreply.github.com"
+          git add data/state.sqlite3
+          if git diff --cached --quiet; then
+            echo "No state changes to commit."
+          else
+            git commit -m "Update listing state [skip ci]"
+            git push
+          fi

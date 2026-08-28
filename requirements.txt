@@ -1,0 +1,5 @@
+# No third-party dependencies. Everything in this project (HTTP calls, CSV
+# parsing, JSON, SQLite, SMTP) is implemented with the Python 3.11+ standard
+# library only, to keep the dependency surface at zero and avoid any pip
+# install step (and its attendant supply-chain / breakage risk) in the daily
+# GitHub Actions run.
